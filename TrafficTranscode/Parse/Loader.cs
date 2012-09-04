@@ -1,40 +1,20 @@
-using System;
 using System.IO;
 using System.Linq;
 using System.Collections.Generic;
-using TrafficTranscode.RealNet;
+using System.Text.RegularExpressions;
+using TrafficTranscode.MetaNet;
 
-namespace TrafficTranscode
+namespace TrafficTranscode.Parse
 {
-	public class RawFile
-	{
-		public string Contents { get; set; }
-		public string Path { get; set; }
-	}
 
-	public class Channel
-	{
-		public int Id { get; set; }
-		public int Input { get; set; }
-		public string UId { get; set; }
-	}
-
-	public class DataFile
-	{
-		public string City { get; set; }
-		public Intersection Intersection { get; set; }
-		public DateTime Start { get; set; }
-		public DateTime Finish { get; set; }
-		public IEnumerable<string> DataChannels { get; set; }
-
-	}
 
     public class Loader
     {
         public List<RawFile> RawFiles { get; set; }
-		public Parser Parser { get; set; }
+        public List<DataFile> DataFiles { get; set; }
+        public IEnumerable<Record> Records { get; private set; }
 
-        public Loader()
+        private Loader()
         {
 			RawFiles = new List<RawFile>();
         }
@@ -57,42 +37,23 @@ namespace TrafficTranscode
 			if (File.Exists (path))
 			{
 				var info = new FileInfo(path);
-				if (info.Extension != "reg" && info.Extension != "log")
+				if (info.Extension != ".rej" && info.Extension != ".log")
 				{
 					File.AppendAllText("unknown_extensions.txt", info.Extension + "\n");
 					return;
 				}
 
-				RawFiles.Add(new RawFile() 
+				RawFiles.Add(new RawFile 
 				{
 					Path = path,
 					Contents = File.ReadAllText(path, System.Text.Encoding.GetEncoding("windows-1250"))
 				});
 			}
+
+            DataFiles = RawFiles.Select(rawFile => new DataFile(rawFile)).ToList();
+
+            Records = DataFiles.SelectMany(df => df.Records);
         }
-    }
-
-    public enum FileType
-    {
-        Unknown, 
-        Registry, 
-        Log, 
-        Image
-    }
-
-    public abstract class Parser
-    {
-
-    }
-
-    public class RegistryParser : Parser
-    {
-
-    }
-
-    public class LogParser : Parser
-    {
-
     }
 }
 
