@@ -9,7 +9,7 @@ namespace TrafficTranscode.Parse
     public static class ParseHelp
     {
         public static string[] LineSeparators = new[] {"\r", "\n"};
-        public static string[] WordSeparators = new[] { " " };
+        public static string[] WordSeparators = new[] { " ", "\t", ":" };
 
         //TODO: using some buffered data (in a file)
         public static IEnumerable<Intersection> GuessIntersections(this RawFile rawFile)
