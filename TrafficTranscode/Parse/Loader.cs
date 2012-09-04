@@ -66,7 +66,7 @@ namespace TrafficTranscode
 				RawFiles.Add(new RawFile() 
 				{
 					Path = path,
-					Contents = File.ReadAllText(path)
+					Contents = File.ReadAllText(path, System.Text.Encoding.GetEncoding("windows-1250"))
 				});
 			}
         }
