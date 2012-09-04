@@ -52,6 +52,7 @@ namespace TrafficTranscode.MetaNet
                     returnedRecords.AddRange(intensityByChannel
                                                  .Select(ibc => new Record
                                                                     {
+                                                                        Traffic = ibc.Value,
                                                                         City = City,
                                                                         Channel =
                                                                             DataChannels.Single(

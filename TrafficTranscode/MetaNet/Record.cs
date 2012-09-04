@@ -5,6 +5,8 @@ namespace TrafficTranscode.MetaNet
 {
     public class Record
     {
+        public int Traffic { get; set; }
+
         public string City { get; set; }
         public MetaIntersection Node { get; set; }
         public DateTime Start { get; set; }
