@@ -9,7 +9,7 @@ namespace TrafficTranscode.Parse
     public static class ParseHelp
     {
         public static string[] LineSeparators = new[] {"\r", "\n"};
-        public static string[] WordSeparators = new[] { " ", "\t", ":" };
+        public static string[] WordSeparators = new[] { " ", "\t"};
 
         //TODO: using some buffered data (in a file)
         public static IEnumerable<Intersection> GuessIntersections(this RawFile rawFile)
@@ -75,6 +75,11 @@ namespace TrafficTranscode.Parse
             return rawFile
                 .LinesStarting(beginning)
                 .First();
+        }
+
+        public static DateTime DateTimeParse(string date, string time)
+        {
+            return DateTime.Parse(String.Format("20{0}T{1}", date, time));
         }
     }
 }

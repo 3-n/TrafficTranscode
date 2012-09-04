@@ -1,4 +1,4 @@
-using System;
+﻿using System;
 using System.Collections.Generic;
 using System.Linq;
 using System.Text.RegularExpressions;
@@ -14,6 +14,7 @@ namespace TrafficTranscode.MetaNet
         public DateTime Start { get; set; }
         public DateTime Finish { get; set; }
         public IEnumerable<Channel> DataChannels { get; set; }
+        public int DeclaredChannelCount { get; set; }
         public int DeclaredRecordCount { get; set; }
         public IEnumerable<string> RecordLines { get; set; }
 
@@ -24,7 +25,7 @@ namespace TrafficTranscode.MetaNet
             get
             {
                 var uIds = DataChannels.Select(ch => ch.UId);
-                var headers = raw.LineStarting("Rekord:").Words().Skip(3).ToList();
+                var headers = raw.LineStarting("Rekord").Words().Skip(3).Take(DeclaredChannelCount).ToList();
 
                 var returnedRecords = new List<Record>();
 
@@ -34,11 +35,11 @@ namespace TrafficTranscode.MetaNet
                     var recordId = words[0];
                     var rawDate = words[1];
                     var rawTime = words[2];
-                    var chHeaders = headers.Skip(3).ToList();
-                    var rawIntensities = words.Skip(3).ToList();
+                    var chHeaders = headers.ToList();
+                    var rawIntensities = words.Skip(3).Take(DeclaredChannelCount).ToList();
 
                     int throwaway;
-                    if (!Int32.TryParse(rawIntensities.Last(), out throwaway))
+                    if (!Int32.TryParse(words.Last(), out throwaway))
                     {
                         Console.WriteLine("File {0} contains measurement-produced error.");
                         continue;
@@ -58,9 +59,7 @@ namespace TrafficTranscode.MetaNet
                                                                         Duriation = TimeResolution,
                                                                         Node = Node,
                                                                         Start =
-                                                                            DateTime.Parse(String.Format("{0}T{1}",
-                                                                                                         rawDate,
-                                                                                                         rawTime)),
+                                                                            ParseHelp.DateTimeParse(rawDate, rawTime),
                                                                         Error = false,
                                                                         ErrorMessage = "no error",
                                                                         Intersection = null, //TODO: hint: hard
@@ -97,11 +96,11 @@ namespace TrafficTranscode.MetaNet
                                     {
                                         Id = Int32.Parse(Regex.Matches(line, @"[0-9]+")[0].Value),
                                         Input = Int32.Parse(Regex.Matches(line, @"[0-9]+")[1].Value),
-                                        UId = line.Split(new[] {" "}, StringSplitOptions.RemoveEmptyEntries).Last()
+                                        UId = line.Words().Last()
                                     });
             Node = new MetaIntersection
                        {
-                           Name = Regex.Match(rawFile.Contents, @"(?<=Miasto\ +:\ +)[\p{L}\p{Pd}]").Value,
+                           Name = Regex.Match(rawFile.Contents, @"(?<=Skrzyżowanie\ +:\ +)[\p{L}\p{Pd}]").Value,
                            Channels = DataChannels,
                            Intersections = rawFile.GuessIntersections()
                 
@@ -109,29 +108,30 @@ namespace TrafficTranscode.MetaNet
 
             TimeResolution = rawFile.TimeResolution();
 
-            Start = DateTime.Parse(String.Format("{0}T{1}",
-                                                 rawFile.LineStarting("Data sta")
-                                                     .Split(ParseHelp.WordSeparators,
-                                                            StringSplitOptions.RemoveEmptyEntries)
-                                                     .Last(),
-                                                 rawFile.LineStarting("Czas sta"))
-                                       .Split(ParseHelp.WordSeparators,
-                                              StringSplitOptions.RemoveEmptyEntries)
-                                       .Last());
-            Finish = DateTime.Parse(String.Format("{0}T{1}",
-                                                  rawFile.LineStarting(("Data ko"))
-                                                      .Split(ParseHelp.WordSeparators,
-                                                             StringSplitOptions.RemoveEmptyEntries)
-                                                      .Last(),
-                                                  rawFile.LineStarting("Czas ko"))
-                                        .Split(ParseHelp.WordSeparators,
-                                               StringSplitOptions.RemoveEmptyEntries)
-                                        .Last());
+            Start = ParseHelp.DateTimeParse(rawFile
+                                                .LineStarting(("Data sta"))
+                                                .Words()
+                                                .Last(),
+                                            rawFile
+                                                .LineStarting("Czas sta")
+                                                .Words()
+                                                .Last());
+            Finish = ParseHelp.DateTimeParse(rawFile
+                                                .LineStarting(("Data ko"))
+                                                .Words()
+                                                .Last(),
+                                            rawFile
+                                                .LineStarting("Czas ko")
+                                                .Words()
+                                                .Last());
 
-            DeclaredRecordCount = Int32.Parse(rawFile.LineStarting("Liczba rekord�w odczytanych do PC")
+            DeclaredRecordCount = Int32.Parse(rawFile.LineStarting("Liczba rekordów odczytanych do PC")
                                                   .Split(ParseHelp.WordSeparators, StringSplitOptions.RemoveEmptyEntries)
                                                   .Last());
-            RecordLines = rawFile.Lines();
+
+            DeclaredChannelCount = Int32.Parse(rawFile.LineStarting("Ilość").Words().Last());
+
+            RecordLines = rawFile.Lines().SkipWhile(line => !line.StartsWith("Rekord:")).Skip(1);
 
         }
     }
