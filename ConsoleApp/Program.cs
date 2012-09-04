@@ -15,7 +15,7 @@ namespace ConsoleApp
 
             var loader = new Loader(testPath);
 
-            var records = loader.Parse();
+            var records = loader.Records;
 
             Console.WriteLine(records.Count());
             Console.ReadKey();
