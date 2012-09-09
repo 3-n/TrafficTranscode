@@ -56,7 +56,19 @@ namespace TrafficTranscode.Parse
 
                     if(theSpan.Count() > 1)
                     {
-                        throw new FormatException(String.Format("Resolution of file not constant: {0}", rawFile.Path));
+                        var histogram = theSpan.Select(s => spans.Count(ts => ts == s));
+                        var peak = histogram.Max();
+
+                        var noPeakHistogram = histogram.Except(new[] {peak});
+
+
+
+                        if (noPeakHistogram.Any(h => h > peak / 10) || noPeakHistogram.Count()<histogram.Count()-1)
+                        {
+                            throw new FormatException(String.Format("Resolution of file not constant: {0}", rawFile.Path));
+                        }
+
+                        return theSpan.OrderByDescending(s => spans.Count(ts => ts == s)).First();
                     }
 
                     return theSpan.First();
