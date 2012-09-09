@@ -84,18 +84,22 @@ namespace TrafficTranscode.Parse
         {
             return rawFileChunk
                 .Replace("+", "")
-                .Replace("-", "")
                 .Replace("|", "")
                 .Split(LineSeparators, StringSplitOptions.RemoveEmptyEntries)
+                .Where(line => !line.Contains("---"))
                 .Select(line => line.Split(WordSeparators, StringSplitOptions.RemoveEmptyEntries))
+                .Where(line => line.Length > 0)
                 .Select(line => (line.First() == "m-d" || line.First() == "h:m") ? line.Take(line.Count() - 1).ToArray() : line)
                 .ToArray();
         }
 
         public static IEnumerable<string> LogFileTableStrings(this RawFile rawFile)
         {
-            return rawFile.Contents
-                .SplitRegex(@"(?<=\-+\+)[^+-|](?=\+\-+)", StringSplitOptions.RemoveEmptyEntries, RegexOptions.Multiline);
+            var border = rawFile.Contents.IndexOf('+');
+            var ret = rawFile.Contents
+                .Substring(border, rawFile.Contents.Length-border)
+                .SplitRegex(@"(?<=\-+\+)[^\+\-\|]+(?=\+\-+)", StringSplitOptions.RemoveEmptyEntries, RegexOptions.Multiline);
+            return ret;
         }
 
         public static string[] SplitRegex(this string input, string pattern, StringSplitOptions stringOptions, RegexOptions regexOptions = RegexOptions.None)
