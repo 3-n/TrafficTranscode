@@ -1,6 +1,7 @@
 using System;
 using System.Collections.Generic;
 using System.Linq;
+using System.Text.RegularExpressions;
 using TrafficTranscode.MetaNet;
 using TrafficTranscode.RealNet;
 
@@ -19,24 +20,89 @@ namespace TrafficTranscode.Parse
 
         public static TimeSpan TimeResolution(this RawFile rawFile)
         {
-            var resLineSplat = rawFile.LineStarting("Okres").Words();
-            TimeSpan unit;
-
-            switch (resLineSplat.Last())
+            switch (rawFile.Type)
             {
-                case "minut":
-                    unit = TimeSpan.FromMinutes(1.0);
-                    break;
-                case "godzina":
-                    unit = TimeSpan.FromHours(1.0);
-                    break;
+                case FileType.Registry:
+                    var resLineSplat = rawFile.LineStarting("Okres").Words();
+                    TimeSpan unit;
+
+                    switch (resLineSplat.Last())
+                    {
+                        case "minut":
+                            unit = TimeSpan.FromMinutes(1.0);
+                            break;
+                        case "godzina":
+                            unit = TimeSpan.FromHours(1.0);
+                            break;
+                        default:
+                            throw new NotSupportedException("Unknown time unit, or parsing oversimplication.");
+                    }
+
+                    var number = Int32.Parse(resLineSplat[resLineSplat.Length - 2]);
+                    return TimeSpan.FromTicks(number*unit.Ticks);
+
+                case FileType.Log:
+
+                    var dateTimes = rawFile.LogRecordTimes();
+
+                    var spans = new List<TimeSpan>();
+
+                    for (int i = 1; i < dateTimes.Count(); i++)
+                    {
+                        spans.Add(dateTimes[i]- dateTimes[i-1]);
+                    }
+
+                    var theSpan = spans.Distinct().ToArray();
+
+                    if(theSpan.Count() > 1)
+                    {
+                        throw new FormatException(String.Format("Resolution of file not constant: {0}", rawFile.Path));
+                    }
+
+                    return theSpan.First();
                 default:
-                    throw new NotSupportedException("Unknown time unit, or parsing oversimplication.");
+                    throw new NotImplementedException();
             }
 
-            var number = Int32.Parse(resLineSplat[resLineSplat.Length - 2]);
+        }
 
-            return TimeSpan.FromTicks(number*unit.Ticks);
+        public static DateTime[] LogRecordTimes(this RawFile rawFile)
+        {
+            var tables = rawFile.LogFileTableStrings().Select(s => s.LogFileTable());
+            var dateRows = tables.SelectMany(t => t.First().Skip(1));
+            var timeRows = tables.SelectMany(t => t.Skip(1).First().Skip(1));
+
+            return dateRows
+                .Zip(timeRows, (dateStr, timeStr) => DateTime.Parse(String.Format("2012-{0}T{1}:00", dateStr, timeStr)))
+                .ToArray();
+
+        }
+
+
+        // this fixes table headers to be start-time-, not interval-based
+        public static string[][] LogFileTable(this string rawFileChunk)
+        {
+            return rawFileChunk
+                .Replace("+", "")
+                .Replace("-", "")
+                .Replace("|", "")
+                .Split(LineSeparators, StringSplitOptions.RemoveEmptyEntries)
+                .Select(line => line.Split(WordSeparators, StringSplitOptions.RemoveEmptyEntries))
+                .Select(line => (line.First() == "m-d" || line.First() == "h:m") ? line.Take(line.Count() - 1).ToArray() : line)
+                .ToArray();
+        }
+
+        public static IEnumerable<string> LogFileTableStrings(this RawFile rawFile)
+        {
+            return rawFile.Contents
+                .SplitRegex(@"(?<=\-+\+)[^+-|](?=\+\-+)", StringSplitOptions.RemoveEmptyEntries, RegexOptions.Multiline);
+        }
+
+        public static string[] SplitRegex(this string input, string pattern, StringSplitOptions stringOptions, RegexOptions regexOptions = RegexOptions.None)
+        {
+            return Regex.Split(input, pattern, regexOptions)
+                .Where(s => stringOptions != StringSplitOptions.RemoveEmptyEntries || !String.IsNullOrEmpty(s))
+                .ToArray();
         }
 
         public static string[] Words(this string line)

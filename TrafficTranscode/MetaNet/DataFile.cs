@@ -1,5 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
+using System.Diagnostics;
+using System.IO;
 using System.Linq;
 using System.Text.RegularExpressions;
 using TrafficTranscode.Parse;
@@ -19,56 +21,99 @@ namespace TrafficTranscode.MetaNet
         public IEnumerable<string> RecordLines { get; set; }
 
         private RawFile raw;
+        private List<Record> returnedRecords;
 
         public IEnumerable<Record> Records 
         { 
             get
             {
-                var uIds = DataChannels.Select(ch => ch.UId);
-                var headers = raw.LineStarting("Rekord").Words().Skip(3).Take(DeclaredChannelCount).ToList();
-
-                var returnedRecords = new List<Record>();
-
-                foreach (var recordLine in RecordLines)
+                if(returnedRecords!=null)
                 {
-                    var words = recordLine.Words();
-                    var recordId = words[0];
-                    var rawDate = words[1];
-                    var rawTime = words[2];
-                    var chHeaders = headers.ToList();
-                    var rawIntensities = words.Skip(3).Take(DeclaredChannelCount).ToList();
-
-                    int throwaway;
-                    if (!Int32.TryParse(words.Last(), out throwaway))
-                    {
-                        Console.WriteLine("File {0} contains measurement-produced error.");
-                        continue;
-                    }
-
-                    var intensityByChannel = chHeaders
-                        .Zip(rawIntensities, (ch, i) => new KeyValuePair<string, int>(ch, Int32.Parse(i)))
-                        .ToDictionary(p => p.Key, p => p.Value);
-
-                    returnedRecords.AddRange(intensityByChannel
-                                                 .Select(ibc => new Record
-                                                                    {
-                                                                        Traffic = ibc.Value,
-                                                                        City = City,
-                                                                        Channel =
-                                                                            DataChannels.Single(
-                                                                                dch => dch.UId == ibc.Key),
-                                                                        Duriation = TimeResolution,
-                                                                        Node = Node,
-                                                                        Start =
-                                                                            ParseHelp.DateTimeParse(rawDate, rawTime),
-                                                                        Error = false,
-                                                                        ErrorMessage = "no error",
-                                                                        Intersection = null, //TODO: hint: hard
-                                                                        Status = 0 //TODO: this is here because, again?
-                                                                    }));
+                    return returnedRecords;
                 }
 
-                return returnedRecords;
+                returnedRecords = new List<Record>();
+
+                switch (raw.Type)
+                {
+                    case FileType.Registry:
+                        var uIds = DataChannels.Select(ch => ch.UId);
+                        var headers = raw.LineStarting("Rekord").Words().Skip(3).Take(DeclaredChannelCount).ToList();
+
+                        foreach (var recordLine in RecordLines)
+                        {
+                            var words = recordLine.Words();
+                            var recordId = words[0];
+                            var rawDate = words[1];
+                            var rawTime = words[2];
+                            var chHeaders = headers.ToList();
+                            var rawIntensities = words.Skip(3).Take(DeclaredChannelCount).ToList();
+
+                            int throwaway;
+                            if (!Int32.TryParse(words.Last(), out throwaway))
+                            {
+                                Console.WriteLine("File {0} contains measurement-produced error.");
+                                continue;
+                            }
+
+                            var intensityByChannel = chHeaders
+                                .Zip(rawIntensities, (ch, i) => new KeyValuePair<string, int>(ch, Int32.Parse(i)))
+                                .ToDictionary(p => p.Key, p => p.Value);
+
+                            returnedRecords.AddRange(intensityByChannel
+                                                            .Select(ibc => new Record
+                                                                            {
+                                                                                Traffic = ibc.Value,
+                                                                                City = City,
+                                                                                Channel =
+                                                                                    DataChannels.Single(
+                                                                                        dch => dch.UId == ibc.Key),
+                                                                                Duriation = TimeResolution,
+                                                                                Node = Node,
+                                                                                Start =
+                                                                                    ParseHelp.DateTimeParse(rawDate, rawTime),
+                                                                                Error = false,
+                                                                                ErrorMessage = "no error",
+                                                                                Intersection = null, //TODO: hint: hard
+                                                                                Status = 0 //TODO: this is here because, again?
+                                                                            }));
+                        }
+
+                        return returnedRecords;
+
+                    case FileType.Log:
+                        var tables = raw.LogFileTableStrings().Select(str => str.LogFileTable());
+
+                        foreach (var table in tables)
+                        {
+                            for (int i = 2; i < table.Length-1; i++)
+                            {
+                                for (int j = 1; j < table.First().Length; j++)
+                                {
+                                    var trafficRaw = Int32.Parse(table[i][j]);
+                                    returnedRecords.Add(new Record
+                                    {
+                                        City = City,
+                                        Channel = new Channel { UId = table[i][0] },
+                                        Duriation = TimeResolution,
+                                        Error = trafficRaw >= 0,
+                                        ErrorMessage = table[i][j],
+                                        Intersection = null, //TODO: hint: hard
+                                        Node = Node,
+                                        Start = DateTime.Parse(String.Format("2012-{0}T{1}:00", table[0][j], table[1][j])),
+                                        Status = trafficRaw,
+                                        Traffic = Math.Max(0, trafficRaw)
+                                    });
+                                }
+                            }
+                        }
+
+                        return returnedRecords;
+
+                    default:
+                        throw new FormatException(String.Format("Resolution of records not possible: {0}", raw.Path));
+                }
+
             }
         } 
 
@@ -80,9 +125,41 @@ namespace TrafficTranscode.MetaNet
                 case FileType.Registry:
                     InitFromRegistry(rawFile);
                     break;
+                case FileType.Log:
+                    InitFromLog(rawFile);
+                    break;
                 default:
                     throw new NotSupportedException(String.Format("Filetype denoted by path {0} not supported", rawFile.Path));
             }
+
+        }
+
+        private void InitFromLog(RawFile rawFile)
+        {
+            raw = rawFile;
+            City = "Poznań"; // oh well
+            DataChannels = rawFile
+                .Lines(line => Regex.IsMatch(line, @"\ +\|\ [0-9A-Z]+\ \|"))
+                .Select(line => line.Words().Skip(1).First())
+                .Distinct()
+                .Select(uid => new Channel {UId = uid});
+
+            Node = new MetaIntersection
+                       {
+                           Name = new FileInfo(rawFile.Path).Directory.Name.Replace(" ", ""),
+                           Channels = DataChannels,
+                           Intersections = rawFile.GuessIntersections()
+                       };
+
+            TimeResolution = rawFile.TimeResolution();
+
+            Start = rawFile.LogRecordTimes().Min();
+            Finish = rawFile.LogRecordTimes().Max();
+
+            DeclaredRecordCount = -1;
+            DeclaredChannelCount = -1;
+
+            RecordLines = null; //TODO: tmp?
 
         }
 
@@ -109,6 +186,7 @@ namespace TrafficTranscode.MetaNet
 
             TimeResolution = rawFile.TimeResolution();
 
+            //TODO: fix, headers lie
             Start = ParseHelp.DateTimeParse(rawFile
                                                 .LineStarting(("Data sta"))
                                                 .Words()
