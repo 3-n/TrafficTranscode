@@ -14,7 +14,7 @@ namespace TrafficTranscode.MetaNet
                     case "rej":
                         return FileType.Registry;
                     case "log":
-                        return FileType.Registry;
+                        return FileType.Log;
                     default:
                         return FileType.Unknown;
                 }
