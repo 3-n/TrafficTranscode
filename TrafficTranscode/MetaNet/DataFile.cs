@@ -32,6 +32,8 @@ namespace TrafficTranscode.MetaNet
                     return returnedRecords;
                 }
 
+                
+
                 returnedRecords = new List<Record>();
 
                 switch (raw.Type)
@@ -68,7 +70,7 @@ namespace TrafficTranscode.MetaNet
                                                                                 Channel =
                                                                                     DataChannels.Single(
                                                                                         dch => dch.UId == ibc.Key),
-                                                                                Duriation = TimeResolution,
+                                                                                Duration = TimeResolution,
                                                                                 Node = Node,
                                                                                 Start =
                                                                                     ParseHelp.DateTimeParse(rawDate, rawTime),
@@ -95,7 +97,7 @@ namespace TrafficTranscode.MetaNet
                                     {
                                         City = City,
                                         Channel = new Channel { UId = table[i][0] },
-                                        Duriation = TimeResolution,
+                                        Duration = TimeResolution,
                                         Error = trafficRaw >= 0,
                                         ErrorMessage = table[i][j],
                                         Intersection = null, //TODO: hint: hard
@@ -108,7 +110,33 @@ namespace TrafficTranscode.MetaNet
                             }
                         }
 
-                        return returnedRecords;
+                        var maliciousDurations = new List<TimeSpan>();
+
+                        returnedRecords = returnedRecords
+                            .Where(r =>
+                                       {
+                                           if(r.Duration.Ticks > TimeResolution.Ticks*5 || r.Duration.Ticks < TimeResolution.Ticks/5)
+                                           {
+                                               maliciousDurations.Add(r.Duration);
+                                               return false;
+                                           }
+                                           return true;
+                                       })
+                            .ToList();
+
+                        //var outOfResolutionRecords = returnedRecords.Where(r => r.Duration != TimeResolution);
+
+                        var tooLong = returnedRecords.Where(r => r.Duration > TimeResolution);
+                        var tooShort = returnedRecords.Where(r => r.Duration < TimeResolution);
+
+                        var tooShortCorrected = tooShort.Stitch(TimeResolution) ?? new List<Record>();
+                        var tooLongCorrected = tooLong.SelectMany(r => r.Split(TimeResolution));
+
+                        return returnedRecords
+                            .Except(tooLong)
+                            .Except(tooShort)
+                            .Union(tooShortCorrected)
+                            .Union(tooLongCorrected);
 
                     default:
                         throw new FormatException(String.Format("Resolution of records not possible: {0}", raw.Path));

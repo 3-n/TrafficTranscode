@@ -39,6 +39,7 @@
     <Compile Include="MetaNet\FileType.cs" />
     <Compile Include="MetaNet\MetaIntersection.cs" />
     <Compile Include="MetaNet\RawFile.cs" />
+    <Compile Include="Parse\ParseException.cs" />
     <Compile Include="Parse\ParseHelp.cs" />
     <Compile Include="RealNet\Intersection.cs" />
     <Compile Include="MetaNet\Record.cs" />
