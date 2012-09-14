@@ -110,19 +110,21 @@ namespace TrafficTranscode.MetaNet
                             }
                         }
 
-                        var maliciousDurations = new List<TimeSpan>();
+                        var maliciousDurations = returnedRecords
+                            .Where( r => r.Duration.Ticks > TimeResolution.Ticks*5 || r.Duration.Ticks < TimeResolution.Ticks/5);
 
                         returnedRecords = returnedRecords
                             .Where(r =>
                                        {
                                            if(r.Duration.Ticks > TimeResolution.Ticks*5 || r.Duration.Ticks < TimeResolution.Ticks/5)
                                            {
-                                               maliciousDurations.Add(r.Duration);
                                                return false;
                                            }
                                            return true;
                                        })
                             .ToList();
+
+                        File.WriteAllLines("malicious_durations.txt", maliciousDurations.Select(ts => ts.ToString()));
 
                         //var outOfResolutionRecords = returnedRecords.Where(r => r.Duration != TimeResolution);
 
