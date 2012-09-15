@@ -54,7 +54,7 @@ namespace TrafficTranscode.MetaNet
                             int throwaway;
                             if (!Int32.TryParse(words.Last(), out throwaway))
                             {
-                                Console.WriteLine("File {0} contains measurement-produced error.");
+                                Console.WriteLine("File {0} contains measurement-produced error.", raw.Path);
                                 continue;
                             }
 
