@@ -1,0 +1,3 @@
+[submodule "lib/Migrant"]
+	path = lib/Migrant
+	url = git://github.com/antmicro/Migrant.git
