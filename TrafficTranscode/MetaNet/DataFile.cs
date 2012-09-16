@@ -23,6 +23,11 @@ namespace TrafficTranscode.MetaNet
         private RawFile raw;
         private List<Record> returnedRecords;
 
+        public override string ToString()
+        {
+            return String.Format("{0}_{1}", Node, Start.ToString("yyyyMMdd_hh-mm-ss"));
+        }
+
         public IEnumerable<Record> Records 
         { 
             get

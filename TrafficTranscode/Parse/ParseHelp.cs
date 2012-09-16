@@ -56,10 +56,10 @@ namespace TrafficTranscode.Parse
 
                     if(theSpan.Count() > 1)
                     {
-                        var histogram = theSpan.Select(s => spans.Count(ts => ts == s));
-                        var peak = histogram.Max();
+                        //var histogram = theSpan.Select(s => spans.Count(ts => ts == s));
+                        //var peak = histogram.Max();
 
-                        var noPeakHistogram = histogram.Except(new[] {peak});
+                        //var noPeakHistogram = histogram.Except(new[] {peak});
 
 
 
@@ -80,9 +80,9 @@ namespace TrafficTranscode.Parse
 
         public static DateTime[] LogRecordTimes(this RawFile rawFile)
         {
-            var tables = rawFile.LogFileTableStrings().Select(s => s.LogFileTable());
-            var dateRows = tables.SelectMany(t => t.First().Skip(1));
-            var timeRows = tables.SelectMany(t => t.Skip(1).First().Skip(1));
+            var tables = rawFile.LogFileTableStrings().Select(s => s.LogFileTable()).ToArray();
+            var dateRows = tables.SelectMany(t => t.Data.First().Skip(1));
+            var timeRows = tables.SelectMany(t => t.Data.Skip(1).First().Skip(1));
 
             return dateRows
                 .Zip(timeRows, (dateStr, timeStr) => DateTime.Parse(String.Format("2012-{0}T{1}:00", dateStr, timeStr)))
@@ -90,11 +90,10 @@ namespace TrafficTranscode.Parse
 
         }
 
-
         // this fixes table headers to be start-time-, not interval-based
-        public static string[][] LogFileTable(this string rawFileChunk)
+        public static LogTable LogFileTable(this string rawFileChunk)
         {
-            return rawFileChunk
+            var tableData = rawFileChunk
                 .Replace("+", "")
                 .Replace("|", "")
                 .Split(LineSeparators, StringSplitOptions.RemoveEmptyEntries)
@@ -103,6 +102,7 @@ namespace TrafficTranscode.Parse
                 .Where(line => line.Length > 0)
                 .Select(line => (line.First() == "m-d" || line.First() == "h:m") ? line.Take(line.Count() - 1).ToArray() : line)
                 .ToArray();
+            return new LogTable(tableData);
         }
 
         public static IEnumerable<string> LogFileTableStrings(this RawFile rawFile)
