@@ -6,6 +6,7 @@ using System.IO;
 using System.Linq;
 using System.Text;
 using System.Threading.Tasks;
+using AntMicro.Migrant;
 using TrafficTranscode.MetaNet;
 using TrafficTranscode.Parse;
 
@@ -15,40 +16,61 @@ namespace ConsoleApp
     {
         static void Main(string[] args)
         {
+            //TODO: protobuf records
+            //TODO: parameters filtering records by
+            // - intersection
+            // - metaintersection
+            // - time (from, to, <=, <)
+            // - channels (also for infering from metaintersection, intersection)
 
             var folderName = "folder";
+            var recordsFileName = "records.mig";
+            var testPath = @"E:\Politechnika\TWO\MGR\Natężenia";
 
             if (!Directory.Exists(folderName))
             {
                 Directory.CreateDirectory(folderName);
             }
 
-            var a = @"ab\cd";
-            Console.WriteLine(a.Replace('\\', '-'));
-
-            var now = DateTime.Now.ToString("yyyyMMdd_hh-mm-ss");
-            Console.WriteLine(now);
-            Console.WriteLine(now.IndexOf('\\'));
-            File.WriteAllText(String.Format("{0}\\{1}.txt", "folder", now), "abc");
 
             var sw = new Stopwatch();
             sw.Start();
-            //var testPath = @"E:\Politechnika\TWO\MGR\Natężenia\Głogowska - Rynek Łazarski\Poznań, Głogowska-Rynek [248] 12-06-2012.rej";
-            var testPath = @"E:\Politechnika\TWO\MGR\Natężenia";//\Grochowska - Arciszewskiego";
 
-            var loader = new Loader(testPath);
+            IEnumerable<Record> records;
+            Record[] enumerable;
+            Loader loader;
 
-            Console.WriteLine("LOADED AT {0}s", sw.ElapsedMilliseconds/1000);
+            var serializer = new Serializer();
+            serializer.Initialize(typeof(Loader));
 
-            var records = loader.Records;
+
+            if (!File.Exists(recordsFileName))
+            {
+                Console.WriteLine("SERIALIZIN'");
+                loader = new Loader(testPath);
+                Console.WriteLine("LOADER CREATED AT {0:0.00}s", sw.Elapsed.TotalSeconds);
+                var fStream = new FileStream(recordsFileName, FileMode.Create);
+                serializer.Serialize(loader, fStream);
+                Console.WriteLine("LOADER SERIALIZED AT {0:0.00}s", sw.Elapsed.TotalSeconds);
+            }
+            else
+            {
+                Console.WriteLine("DESERIALIZIN'");
+                var fStream = new FileStream(recordsFileName, FileMode.Open);
+                loader = serializer.Deserialize<Loader>(fStream);
+                Console.WriteLine("LOADER DESERIALIZED AT {0:0.00}s", sw.Elapsed.TotalSeconds);
+            }
+            Console.WriteLine("LOADED AT {0:0.00}s", sw.Elapsed.TotalSeconds);
+
+            records = loader.Records;
 
             File.WriteAllLines("bad_files.txt", ParseDiagnostics.BadFiles);
 
-            var enumerable = records as Record[] ?? records.ToArray();
+            enumerable = records as Record[] ?? records.ToArray();
             Console.WriteLine(enumerable.Count());
 
             sw.Stop();
-            Console.WriteLine("RECORDS EXTRACTED AT {0}s", sw.Elapsed.TotalSeconds);
+            Console.WriteLine("RECORDS EXTRACTED AT {0:0.00}s", sw.Elapsed.TotalSeconds);
             Console.ReadKey();
             sw.Start();
 
@@ -92,11 +114,11 @@ namespace ConsoleApp
                 File.WriteAllText(String.Format("{0}\\{1}.txt", "folder", dataFile), sb.ToString());
                 f++;
 
-                Console.WriteLine("{0}/{1} files, {2}s (+{3}s) elapsed...", f, loader.DataFiles.Count, sw.Elapsed.TotalSeconds, fileSw.Elapsed.TotalSeconds);
+                Console.WriteLine("{0}/{1} files, {2:0.00}s (+{3:0.00}s) elapsed...", f, loader.DataFiles.Count, sw.Elapsed.TotalSeconds, fileSw.Elapsed.TotalSeconds);
                 fileSw.Restart();
             }
 
-            Console.WriteLine("FILES WRITTEN AT {0}s", sw.ElapsedMilliseconds / 1000);
+            Console.WriteLine("FILES WRITTEN AT {0:0.00}s", sw.ElapsedMilliseconds / 1000);
 
             Console.ReadKey();
         }
