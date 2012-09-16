@@ -91,59 +91,77 @@ namespace TrafficTranscode.MetaNet
                     case FileType.Log:
                         var tables = raw.LogFileTableStrings().Select(str => str.LogFileTable());
 
+                        var recordsByChannel = new Dictionary<Channel, List<Record>>();
+
                         foreach (var table in tables)
                         {
-                            for (int i = 2; i < table.Length-1; i++)
+                            if(table.Data.Select(row => row.Length).Distinct().Count() > 1)
                             {
-                                for (int j = 1; j < table.First().Length; j++)
+                                ParseDiagnostics.BadFiles.Add(raw.Path);
+                                continue; //TODO: make a workaround instead of fixin files
+                            }
+
+                            var tableResolution = table.RecordSpans().First();
+                            var pseudoChCount = table.Data.Last().First() == "Tot."
+                                                    ? table.Data.Length - 1
+                                                    : table.Data.Length;
+
+
+                            if (!recordsByChannel.Any())
+                            {
+                                for (int i = 2; i < pseudoChCount; i++)
                                 {
-                                    var trafficRaw = Int32.Parse(table[i][j]);
-                                    returnedRecords.Add(new Record
+                                    recordsByChannel.Add(new Channel {UId = table.Data[i][0]}, new List<Record>());
+                                }
+                            }
+
+                            for (int i = 2; i < pseudoChCount; i++)
+                            {
+                                var iChannel = new Channel {UId = table.Data[i][0]};
+
+                                for (int j = 1; j < table.Data.First().Length; j++)
+                                {
+                                    var trafficRaw = Int32.Parse(table.Data[i][j]);
+                                    var rawRecord = new Record
                                     {
                                         City = City,
-                                        Channel = new Channel { UId = table[i][0] },
-                                        Duration = TimeResolution,
+                                        Channel = iChannel,
+                                        Duration = table.TimeResolution,
                                         Error = trafficRaw >= 0,
-                                        ErrorMessage = table[i][j],
+                                        ErrorMessage = table.Data[i][j],
                                         Intersection = null, //TODO: hint: hard
                                         Node = Node,
-                                        Start = DateTime.Parse(String.Format("2012-{0}T{1}:00", table[0][j], table[1][j])),
+                                        Start =  DateTime.Parse(String.Format("2012-{0}T{1}:00",
+                                                                            table.Data[0][j],
+                                                                            table.Data[1][j])),
                                         Status = trafficRaw,
                                         Traffic = Math.Max(0, trafficRaw)
-                                    });
+                                    };
+
+                                    if (rawRecord.Duration.Ticks > TimeResolution.Ticks * 5 || rawRecord.Duration.Ticks < TimeResolution.Ticks / 5)
+                                    {
+                                        throw new NotImplementedException("Hoping atypical stuff is not needed yet.");
+                                    }
+
+                                    if (table.TimeResolution == TimeResolution)
+                                    {
+                                        recordsByChannel[iChannel].Add(rawRecord);
+                                    }
+                                    else if (table.TimeResolution > TimeResolution)
+                                    {
+                                        recordsByChannel[iChannel].AddRange(rawRecord.Split(TimeResolution));
+                                    }
+                                    else if (table.TimeResolution < TimeResolution)
+                                    {
+                                        throw new NotImplementedException("Hoping stitching is not needed for now.");
+                                    }
                                 }
                             }
                         }
 
-                        var maliciousDurations = returnedRecords
-                            .Where( r => r.Duration.Ticks > TimeResolution.Ticks*5 || r.Duration.Ticks < TimeResolution.Ticks/5);
+                        returnedRecords = recordsByChannel.SelectMany(pair => pair.Value).ToList();
 
-                        returnedRecords = returnedRecords
-                            .Where(r =>
-                                       {
-                                           if(r.Duration.Ticks > TimeResolution.Ticks*5 || r.Duration.Ticks < TimeResolution.Ticks/5)
-                                           {
-                                               return false;
-                                           }
-                                           return true;
-                                       })
-                            .ToList();
-
-                        File.WriteAllLines("malicious_durations.txt", maliciousDurations.Select(ts => ts.ToString()));
-
-                        //var outOfResolutionRecords = returnedRecords.Where(r => r.Duration != TimeResolution);
-
-                        var tooLong = returnedRecords.Where(r => r.Duration > TimeResolution);
-                        var tooShort = returnedRecords.Where(r => r.Duration < TimeResolution);
-
-                        var tooShortCorrected = tooShort.Stitch(TimeResolution) ?? new List<Record>();
-                        var tooLongCorrected = tooLong.SelectMany(r => r.Split(TimeResolution));
-
-                        return returnedRecords
-                            .Except(tooLong)
-                            .Except(tooShort)
-                            .Union(tooShortCorrected)
-                            .Union(tooLongCorrected);
+                        return returnedRecords;
 
                     default:
                         throw new FormatException(String.Format("Resolution of records not possible: {0}", raw.Path));
