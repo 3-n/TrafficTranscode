@@ -192,7 +192,7 @@ namespace TrafficTranscode.MetaNet
             raw = rawFile;
             City = "Poznań"; // oh well
             DataChannels = rawFile
-                .Lines(line => Regex.IsMatch(line, @"\ +\|\ [0-9A-Z]+\ \|"))
+                .Lines(line => Regex.IsMatch(line, @"\ +\|\ [0-9A-Z]+\ \|", RegexOptions.Compiled))
                 .Select(line => line.Words().Skip(1).First())
                 .Distinct()
                 .Select(uid => new Channel {UId = uid});
@@ -220,18 +220,18 @@ namespace TrafficTranscode.MetaNet
         {
             raw = rawFile;
             //var lines = rawFile.Contents.Split(ParseHelp.LineSeparators, StringSplitOptions.RemoveEmptyEntries);
-            City = Regex.Match(rawFile.Contents, @"(?<=Miasto\ +:\ +)\p{L}").Value;
+            City = Regex.Match(rawFile.Contents, @"(?<=Miasto\ +:\ +)\p{L}", RegexOptions.Compiled).Value;
             DataChannels = rawFile
                 .Lines(line => line.StartsWith("Lp."))
                 .Select(line => new Channel
                                     {
-                                        Id = Int32.Parse(Regex.Matches(line, @"[0-9]+")[0].Value),
-                                        Input = Int32.Parse(Regex.Matches(line, @"[0-9]+")[1].Value),
+                                        Id = Int32.Parse(Regex.Matches(line, @"[0-9]+", RegexOptions.Compiled)[0].Value),
+                                        Input = Int32.Parse(Regex.Matches(line, @"[0-9]+", RegexOptions.Compiled)[1].Value),
                                         UId = line.Words().Last()
                                     });
             Node = new MetaIntersection
                        {
-                           Name = Regex.Match(rawFile.Contents, @"(?<=Skrzyżowanie\ +:\ +)[\p{L}\p{Pd}]").Value,
+                           Name = Regex.Match(rawFile.Contents, @"(?<=Skrzyżowanie\ +:\ +)[\p{L}\p{Pd}]", RegexOptions.Compiled).Value,
                            Channels = DataChannels,
                            Intersections = rawFile.GuessIntersections()
                 

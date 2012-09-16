@@ -110,7 +110,7 @@ namespace TrafficTranscode.Parse
             var border = rawFile.Contents.IndexOf('+');
             var ret = rawFile.Contents
                 .Substring(border, rawFile.Contents.Length-border)
-                .SplitRegex(@"(?<=\-+\+)[^\+\-\|]+(?=\+\-+)", StringSplitOptions.RemoveEmptyEntries, RegexOptions.Multiline);
+                .SplitRegex(@"(?<=\-+\+)[^\+\-\|]+(?=\+\-+)", StringSplitOptions.RemoveEmptyEntries, RegexOptions.Compiled|RegexOptions.Multiline);
             return ret;
         }
 
