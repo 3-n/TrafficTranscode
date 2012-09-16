@@ -48,15 +48,19 @@ namespace ConsoleApp
             Console.WriteLine(enumerable.Count());
 
             sw.Stop();
-            Console.WriteLine("RECORDS EXTRACTED AT {0}s", sw.ElapsedMilliseconds / 1000);
+            Console.WriteLine("RECORDS EXTRACTED AT {0}s", sw.Elapsed.TotalSeconds);
             Console.ReadKey();
             sw.Start();
 
             var f = 0;
+            var fileSw = new Stopwatch();
+            fileSw.Start();
 
             foreach (var dataFile in loader.DataFiles)
             {
-                
+
+                enumerable = dataFile.Records as Record[] ?? dataFile.Records.ToArray();
+
                 var sb = new StringBuilder();
                 int i = 0;
 
@@ -72,7 +76,7 @@ namespace ConsoleApp
                 foreach (var time in enumerable.Select(r => r.Start).Distinct().OrderBy(dt => dt))
                 {
                     sb.Append(String.Format("{0}:\t", time.ToString("MM-dd hh:mm")));
-                    foreach (var ch in loader.DataFiles.First().DataChannels)
+                    foreach (var ch in dataFile.DataChannels)
                     {
                         DateTime time1 = time;
                         Channel ch1 = ch;
@@ -86,8 +90,10 @@ namespace ConsoleApp
                 }
 
                 File.WriteAllText(String.Format("{0}\\{1}.txt", "folder", dataFile), sb.ToString());
+                f++;
 
-                if (f++ % 9 == 0) Console.WriteLine("{0}/{1} files...", f, loader.DataFiles.Count);
+                Console.WriteLine("{0}/{1} files, {2}s (+{3}s) elapsed...", f, loader.DataFiles.Count, sw.Elapsed.TotalSeconds, fileSw.Elapsed.TotalSeconds);
+                fileSw.Restart();
             }
 
             Console.WriteLine("FILES WRITTEN AT {0}s", sw.ElapsedMilliseconds / 1000);
