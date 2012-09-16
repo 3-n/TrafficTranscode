@@ -1,6 +1,7 @@
 ﻿using System;
 using System.Collections.Generic;
 using System.Diagnostics;
+using System.Globalization;
 using System.IO;
 using System.Linq;
 using System.Text;
@@ -14,6 +15,22 @@ namespace ConsoleApp
     {
         static void Main(string[] args)
         {
+
+            var folderName = "folder";
+
+            if (!Directory.Exists(folderName))
+            {
+                Directory.CreateDirectory(folderName);
+            }
+
+            var a = @"ab\cd";
+            Console.WriteLine(a.Replace('\\', '-'));
+
+            var now = DateTime.Now.ToString("yyyyMMdd_hh-mm-ss");
+            Console.WriteLine(now);
+            Console.WriteLine(now.IndexOf('\\'));
+            File.WriteAllText(String.Format("{0}\\{1}.txt", "folder", now), "abc");
+
             var sw = new Stopwatch();
             sw.Start();
             //var testPath = @"E:\Politechnika\TWO\MGR\Natężenia\Głogowska - Rynek Łazarski\Poznań, Głogowska-Rynek [248] 12-06-2012.rej";
@@ -29,41 +46,51 @@ namespace ConsoleApp
 
             var enumerable = records as Record[] ?? records.ToArray();
             Console.WriteLine(enumerable.Count());
-            //Console.ReadKey();
 
+            sw.Stop();
             Console.WriteLine("RECORDS EXTRACTED AT {0}s", sw.ElapsedMilliseconds / 1000);
+            Console.ReadKey();
+            sw.Start();
 
-            var sb = new StringBuilder();
-            int i = 0;
+            var f = 0;
 
-            sb.Append(String.Format("\t\t\t\t"));
-
-            foreach (var ch in loader.DataFiles.First().DataChannels)
+            foreach (var dataFile in loader.DataFiles)
             {
-                sb.Append(String.Format("{0}\t", ch.UId));
-            }
-
-            sb.Append(Environment.NewLine);
-
-            foreach (var time in enumerable.Select(r => r.Start).Distinct().OrderBy(dt => dt))
-            {
-                sb.Append(String.Format("{0}:\t", time.ToString("MM-dd hh:mm")));
-                foreach (var ch in loader.DataFiles.First().DataChannels)
-                {
-                    DateTime time1 = time;
-                    Channel ch1 = ch;
-                    sb.Append(String.Format("{0}\t\t", enumerable
-                        .Where(r => r.Start == time1 && r.Channel == ch1)
-                        .ToLine()));
-                   if(i++%1000==0) Console.WriteLine(i);
-                }
                 
+                var sb = new StringBuilder();
+                int i = 0;
+
+                sb.Append(String.Format("\t\t\t\t"));
+
+                foreach (var ch in dataFile.DataChannels)
+                {
+                    sb.Append(String.Format("{0}\t", ch.UId));
+                }
+
                 sb.Append(Environment.NewLine);
+
+                foreach (var time in enumerable.Select(r => r.Start).Distinct().OrderBy(dt => dt))
+                {
+                    sb.Append(String.Format("{0}:\t", time.ToString("MM-dd hh:mm")));
+                    foreach (var ch in loader.DataFiles.First().DataChannels)
+                    {
+                        DateTime time1 = time;
+                        Channel ch1 = ch;
+                        sb.Append(String.Format("{0}\t\t", enumerable
+                            .Where(r => r.Start == time1 && r.Channel == ch1)
+                            .ToLine()));
+                        //if (i++ % 1000 == 0) Console.WriteLine(i);
+                    }
+
+                    sb.Append(Environment.NewLine);
+                }
+
+                File.WriteAllText(String.Format("{0}\\{1}.txt", "folder", dataFile), sb.ToString());
+
+                if (f++ % 9 == 0) Console.WriteLine("{0}/{1} files...", f, loader.DataFiles.Count);
             }
 
-            File.WriteAllText("test.txt", sb.ToString());
-
-            Console.WriteLine("FILE WRITTEN AT {0}s", sw.ElapsedMilliseconds / 1000);
+            Console.WriteLine("FILES WRITTEN AT {0}s", sw.ElapsedMilliseconds / 1000);
 
             Console.ReadKey();
         }
@@ -80,7 +107,8 @@ namespace ConsoleApp
             var duration = records.Any() ? records.First().Duration : TimeSpan.Zero;
 
 
-            return String.Format("{0}({1}) {2}",
+            //return String.Format("{0}({1}) {2}",
+            return String.Format("{2}",
                                  start,
                                  duration,
                                  traffs);
