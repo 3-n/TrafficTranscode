@@ -8,5 +8,10 @@ namespace TrafficTranscode.MetaNet
         public string Name { get; set; }
         public IEnumerable<Intersection> Intersections { get; set; }
         public IEnumerable<Channel> Channels { get; set; }
+
+        public override string ToString()
+        {
+            return Name;
+        }
     }
 }
